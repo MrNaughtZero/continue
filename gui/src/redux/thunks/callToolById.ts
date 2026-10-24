@@ -7,6 +7,7 @@ import { callClientTool } from "../../util/clientTools/callClientTool";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   acceptToolCall,
+  allowToolForSession,
   errorToolCall,
   setInactive,
   setToolCallCalling,
@@ -14,11 +15,21 @@ import {
 } from "../slices/sessionSlice";
 import { ThunkApiType } from "../store";
 import { findToolCallById, logToolUsage } from "../util";
+import { selectActiveTools } from "../selectors/selectActiveTools";
+import { selectPendingToolCalls } from "../selectors/selectToolCalls";
+import { chatApprovalScope } from "../util/chatApprovalScope";
+import { sessionToolPolicies } from "../util/sessionToolPolicies";
+import { evaluateToolPolicies } from "./evaluateToolPolicies";
 import { streamResponseAfterToolCall } from "./streamResponseAfterToolCall";
 
 export const callToolById = createAsyncThunk<
   void,
-  { toolCallId: string; isAutoApproved?: boolean; depth?: number },
+  {
+    toolCallId: string;
+    isAutoApproved?: boolean;
+    acceptOnce?: boolean;
+    depth?: number;
+  },
   ThunkApiType
 >("chat/callTool", async (inputs, { dispatch, extra, getState }) => {
   const { toolCallId, isAutoApproved, depth = 0 } = inputs;
@@ -38,6 +49,65 @@ export const callToolById = createAsyncThunk<
 
   if (!selectedChatModel) {
     throw new Error("No model selected");
+  }
+
+  // Both the toolbar and keyboard use this path. Automatic execution and
+  // "Accept once" must never create a broader grant.
+  const scope =
+    !isAutoApproved && !inputs.acceptOnce
+      ? chatApprovalScope(
+          toolCallState.toolCall.function.name,
+          selectActiveTools(state),
+        )
+      : undefined;
+  if (scope) {
+    for (const name of scope.toolNames) dispatch(allowToolForSession(name));
+    const approvedState = getState();
+    const wasAborted = state.session.streamAborter.signal.aborted;
+    const policies = await evaluateToolPolicies(
+      (action: any) =>
+        getState().session.id === state.session.id ? dispatch(action) : action,
+      extra.ideMessenger,
+      selectActiveTools(approvedState),
+      selectPendingToolCalls(approvedState).filter((call) =>
+        scope.toolNames.includes(call.toolCall.function.name),
+      ),
+      sessionToolPolicies(
+        approvedState.ui.toolSettings,
+        approvedState.session.sessionToolAllow,
+      ),
+    );
+    for (const { policy, toolCallState: pending } of policies) {
+      const current = getState();
+      if (
+        current.session.id !== state.session.id ||
+        (!wasAborted && state.session.streamAborter.signal.aborted)
+      )
+        return;
+      const name = pending.toolCall.function.name;
+      // Recheck revocation/exclusion after awaiting the policy or another tool.
+      if (
+        !current.session.sessionToolAllow[name] ||
+        !selectActiveTools(current).some((tool) => tool.function.name === name)
+      )
+        continue;
+      if (
+        policy === "allowedWithoutPermission" ||
+        (pending.toolCallId === toolCallId &&
+          policy === "allowedWithPermission")
+      ) {
+        unwrapResult(
+          await dispatch(
+            callToolById({
+              toolCallId: pending.toolCallId,
+              isAutoApproved: true,
+              depth,
+            }),
+          ),
+        );
+      }
+    }
+    return;
   }
 
   dispatch(

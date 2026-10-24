@@ -18,6 +18,13 @@ local improvements while retaining Continue's existing session format and
   **Allow terminal this chat** toggle enables the same mode without running a
   pending command; click it again to restore prompts. Existing global tool settings
   remain available in Tools.
+- Web requests offer **Allow web for chat**, covering both search and reading URLs.
+  **Allow Playwright for chat** covers all enabled tools on the configured
+  **Chrome (Playwright)** server. These are the primary acceptance actions,
+  including the keyboard shortcut. **Accept once** runs just that request.
+  One approval also handles already-pending requests in the same group. These
+  grants use the same open-chat lifetime and reset control described above;
+  unrelated servers and tools do not inherit them.
 - During a run, type additional context and press **Enter twice within 1.5 seconds**,
   or click the send arrow. The current model response is interrupted and the new
   message is appended while retaining the original task. A running tool finishes
