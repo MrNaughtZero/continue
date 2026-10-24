@@ -183,7 +183,7 @@ export function ChatControls() {
             <div>Partial totals: older messages have no recorded usage.</div>
           )}
           <div>
-            Context at last request:{" "}
+            Estimated context at last request:{" "}
             {session.contextInputTokens === undefined
               ? "Not measured yet"
               : `${session.contextInputTokens.toLocaleString()} tokens`}
