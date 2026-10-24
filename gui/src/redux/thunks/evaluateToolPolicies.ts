@@ -1,5 +1,6 @@
 import { ToolPolicy } from "@continuedev/terminal-security";
 import { Tool, ToolCallState } from "core";
+import { BuiltInToolNames } from "core/tools/builtIn";
 import { IIdeMessenger } from "../../context/IdeMessenger";
 import { isEditTool } from "../../util/toolCallState";
 import { errorToolCall, updateToolCallOutput } from "../slices/sessionSlice";
@@ -21,6 +22,7 @@ async function evaluateToolPolicy(
   activeTools: Tool[],
   toolCallState: ToolCallState,
   toolPolicies: ToolPolicies,
+  sessionTerminalApproved: boolean,
 ): Promise<EvaluatedPolicy> {
   // allow edit tool calls without permission
   if (isEditTool(toolCallState.toolCall.function.name)) {
@@ -56,6 +58,16 @@ async function evaluateToolPolicy(
   if (basePolicy === "disabled") {
     return { policy: "disabled", displayValue, toolCallState }; // Cannot override disabled
   }
+  // Explicit approval for this open chat covers command-specific prompts too.
+  // Keep evaluator failures and explicit command exclusions authoritative.
+  if (
+    sessionTerminalApproved &&
+    toolName === BuiltInToolNames.RunTerminalCommand &&
+    basePolicy === "allowedWithoutPermission" &&
+    dynamicPolicy === "allowedWithPermission"
+  ) {
+    return { policy: "allowedWithoutPermission", displayValue, toolCallState };
+  }
   if (
     basePolicy === "allowedWithPermission" &&
     dynamicPolicy === "allowedWithoutPermission"
@@ -77,6 +89,7 @@ export async function evaluateToolPolicies(
   activeTools: Tool[],
   generatedToolCalls: ToolCallState[],
   toolPolicies: ToolPolicies,
+  sessionTerminalApproved = false,
 ): Promise<EvaluatedPolicy[]> {
   // Check if ALL tool calls are auto-approved using dynamic evaluation
   const policyResults = await Promise.all(
@@ -86,6 +99,7 @@ export async function evaluateToolPolicies(
         activeTools,
         toolCallState,
         toolPolicies,
+        sessionTerminalApproved,
       ),
     ),
   );

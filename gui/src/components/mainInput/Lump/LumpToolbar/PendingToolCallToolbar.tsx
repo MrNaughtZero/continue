@@ -1,4 +1,5 @@
 import { allowToolForSession } from "../../../../redux/slices/sessionSlice";
+import { BuiltInToolNames } from "core/tools/builtIn";
 import { useAppDispatch, useAppSelector } from "../../../../redux/hooks";
 import { selectPendingToolCalls } from "../../../../redux/selectors/selectToolCalls";
 import { callToolById } from "../../../../redux/thunks/callToolById";
@@ -51,7 +52,12 @@ export function PendingToolCallToolbar() {
             <Button
               variant="ghost"
               size="sm"
-              title="Automatically approve this tool until you leave this chat. Excluded tools and command rules still apply."
+              title={
+                toolCall.toolCall.function.name ===
+                BuiltInToolNames.RunTerminalCommand
+                  ? "Run terminal commands without confirmation for this open chat. Explicitly blocked commands stay blocked."
+                  : "Automatically approve this tool until you leave this chat. Excluded tools and command rules still apply."
+              }
               onClick={() => {
                 dispatch(allowToolForSession(toolCall.toolCall.function.name));
                 handleAccept(toolCall.toolCallId);

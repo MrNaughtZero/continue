@@ -1,4 +1,6 @@
 import { Button } from "../../components/ui";
+import { BuiltInToolNames } from "core/tools/builtIn";
+import { selectActiveTools } from "../../redux/selectors/selectActiveTools";
 import { selectAgentBusy } from "../../redux/selectors/selectAgentBusy";
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +9,8 @@ import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import {
   newSession,
+  allowToolForSession,
+  revokeToolForSession,
   resetSessionToolAllow,
 } from "../../redux/slices/sessionSlice";
 import { saveCurrentSession } from "../../redux/thunks/session";
@@ -19,6 +23,9 @@ export function ChatControls() {
   const messenger = useContext(IdeMessengerContext);
   const session = useAppSelector((s) => s.session);
   const agentBusy = useAppSelector(selectAgentBusy);
+  const activeTools = useAppSelector(selectActiveTools);
+  const terminalName = BuiltInToolNames.RunTerminalCommand;
+  const terminalAllowed = session.sessionToolAllow[terminalName] === true;
   const model = useAppSelector(selectSelectedChatModel);
   const [expanded, setExpanded] = useState(false);
   const [account, setAccount] = useState<VeniceAccount>();
@@ -135,6 +142,25 @@ export function ChatControls() {
         >
           Usage {expanded ? "▴" : "▾"}
         </Button>
+        {activeTools.some((tool) => tool.function.name === terminalName) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-pressed={terminalAllowed}
+            title="Run terminal commands without confirmation for this open chat. Explicitly blocked commands stay blocked. Resets when you switch chats or reload."
+            onClick={() =>
+              dispatch(
+                terminalAllowed
+                  ? revokeToolForSession(terminalName)
+                  : allowToolForSession(terminalName),
+              )
+            }
+          >
+            {terminalAllowed
+              ? "Terminal: auto · this chat"
+              : "Allow terminal this chat"}
+          </Button>
+        )}
         {agentBusy && (
           <Button
             variant="ghost"

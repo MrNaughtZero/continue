@@ -10,7 +10,7 @@ import { createAsyncThunk, unwrapResult } from "@reduxjs/toolkit";
 import { LLMFullCompletionOptions, ModelDescription } from "core";
 import { getRuleId } from "core/llm/rules/getSystemMessageWithRules";
 import { ToCoreProtocol } from "core/protocol";
-import { BUILT_IN_GROUP_NAME } from "core/tools/builtIn";
+import { BUILT_IN_GROUP_NAME, BuiltInToolNames } from "core/tools/builtIn";
 import { selectActiveTools } from "../selectors/selectActiveTools";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
@@ -380,6 +380,8 @@ export const streamNormalInput = createAsyncThunk<
       activeTools,
       generatedCalls3,
       toolPolicies,
+      state3.session.sessionToolAllow[BuiltInToolNames.RunTerminalCommand] ===
+        true,
     );
     const autoApprovedPolicies = policies.filter(
       ({ policy }) => policy === "allowedWithoutPermission",

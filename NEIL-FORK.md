@@ -13,7 +13,10 @@ local improvements while retaining Continue's existing session format and
 - **Allow this chat** beside a tool request approves that tool for the current
   open chat only. Opening another chat or reloading the extension resets these
   permissions. **Reset permissions** clears them immediately. Globally excluded
-  tools and terminal command rules still apply. Existing global tool settings
+  tools and explicitly blocked terminal commands still apply. For terminal tools,
+  this approval also covers command-specific confirmation prompts. The header's
+  **Allow terminal this chat** toggle enables the same mode without running a
+  pending command; click it again to restore prompts. Existing global tool settings
   remain available in Tools.
 - During a run, type additional context and press **Enter twice within 1.5 seconds**,
   or click the send arrow. The current model response is interrupted and the new

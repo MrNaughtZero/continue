@@ -272,6 +272,9 @@ export const sessionSlice = createSlice({
     allowToolForSession: (state, { payload }: PayloadAction<string>) => {
       state.sessionToolAllow[payload] = true;
     },
+    revokeToolForSession: (state, { payload }: PayloadAction<string>) => {
+      delete state.sessionToolAllow[payload];
+    },
     resetSessionToolAllow: (state) => {
       state.sessionToolAllow = {};
     },
@@ -1129,6 +1132,7 @@ export const selectApplyStateByToolCallId = createSelector(
 export const {
   setContextTokenCounts,
   allowToolForSession,
+  revokeToolForSession,
   resetSessionToolAllow,
   queueSteering,
   shiftSteering,
