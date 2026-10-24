@@ -1,3 +1,9 @@
+# Continue — Neil
+
+Personal Cursor fork with chat controls, session tool permissions, live steering, Venice usage and existing-Chrome tools. See [the fork guide](NEIL-FORK.md) for usage, history preservation and build instructions.
+
+---
+
 <h1 align="center">Continue</h1>
 
 <p align="center">Pioneering open-source coding agent</p>

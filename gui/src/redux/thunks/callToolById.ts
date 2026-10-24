@@ -94,6 +94,8 @@ export const callToolById = createAsyncThunk<
     streamResponse = true;
   }
 
+  if (getState().session.id !== state.session.id) return;
+
   if (error) {
     dispatch(
       updateToolCallOutput({
@@ -141,6 +143,9 @@ export const callToolById = createAsyncThunk<
       streamResponseAfterToolCall({
         toolCallId,
         depth: depth + 1,
+        ...(state.session.streamAborter.signal.aborted
+          ? { continueResponse: false }
+          : {}),
       }),
     );
     unwrapResult(wrapped);

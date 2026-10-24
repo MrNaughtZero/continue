@@ -1,3 +1,4 @@
+// UI-only progress actions are covered by steering.test.ts; keep these assertions focused on the original chat flow.
 import { JSONContent } from "@tiptap/core";
 import { InputModifiers } from "core";
 import { describe, expect, it, vi } from "vitest";
@@ -98,7 +99,16 @@ describe("streamResponseThunk", () => {
     expect(result.type).toBe("chat/streamResponse/fulfilled");
 
     // Verify the complete error handling flow
-    const dispatchedActions = mockStoreNoModel.getActions();
+    const dispatchedActions = mockStoreNoModel
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
     expect(dispatchedActions).toEqual([
       {
         type: "chat/streamResponse/pending",
@@ -256,7 +266,16 @@ describe("streamResponseThunk", () => {
     expect(result.type).toBe("chat/streamResponse/fulfilled");
 
     // Verify exact action sequence for this error path
-    const dispatchedActions = mockStore.getActions();
+    const dispatchedActions = mockStore
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
     expect(dispatchedActions).toEqual([
       {
         type: "chat/streamResponse/pending",
@@ -598,7 +617,16 @@ describe("streamResponseThunk", () => {
     expect(result.type).toBe("chat/streamResponse/fulfilled");
 
     // Verify exact action sequence for compilation error with dialog
-    const dispatchedActions = mockStore.getActions();
+    const dispatchedActions = mockStore
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
     expect(dispatchedActions).toEqual([
       {
         type: "chat/streamResponse/pending",

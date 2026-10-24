@@ -1,3 +1,5 @@
+import { getVeniceAccount } from "./util/veniceAccount";
+import { withWorkspaceContext } from "./llm/workspaceContext";
 import { fetchwithRequestOptions } from "@continuedev/fetch";
 import * as URI from "uri-js";
 import { v4 as uuidv4 } from "uuid";
@@ -588,6 +590,13 @@ export class Core {
     });
     on("llm/listModels", this.handleListModels.bind(this));
 
+    on("venice/account", async () =>
+      getVeniceAccount(
+        (await this.configHandler.loadConfig()).config?.selectedModelByRole
+          .chat,
+      ),
+    );
+
     on("llm/compileChat", async (msg) => {
       const { messages, options } = msg.data;
       const model = (await this.configHandler.loadConfig()).config
@@ -597,7 +606,10 @@ export class Core {
         throw new Error("No chat model selected");
       }
 
-      return model.compileChatMessages(messages, options);
+      return model.compileChatMessages(
+        await withWorkspaceContext(messages, this.ide),
+        options,
+      );
     });
 
     // Provide messenger to utils so they can interact with GUI + state

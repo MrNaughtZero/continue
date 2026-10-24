@@ -1,3 +1,4 @@
+import { requireVisibleReply } from "./workspaceContext";
 import { fetchwithRequestOptions } from "@continuedev/fetch";
 import { ChatMessage, IDE, PromptLog } from "..";
 import { ConfigHandler } from "../config/ConfigHandler";
@@ -112,12 +113,16 @@ export async function* llmStreamChat(
 
       return next.value;
     } else {
-      const gen = model.streamChat(
+      const rawGenerator = model.streamChat(
         messages,
         abortController.signal,
         completionOptions,
         messageOptions,
       );
+      const gen =
+        model.model === "abliteration-abliterated-model-large-v2"
+          ? requireVisibleReply(rawGenerator, abortController.signal)
+          : rawGenerator;
       let next = await gen.next();
       while (!next.done) {
         if (abortController.signal.aborted) {

@@ -486,6 +486,10 @@ export interface SymbolWithRange extends RangeInFile {
 export type FileSymbolMap = Record<string, SymbolWithRange[]>;
 
 export interface PromptLog {
+  usageProvider?: "venice";
+  model?: string;
+  usage?: Usage;
+  usageEstimated?: boolean;
   modelTitle: string;
   modelProvider: string;
   prompt: string;
@@ -1949,6 +1953,8 @@ export interface CompleteOnboardingPayload {
 }
 
 export interface CompiledMessagesResult {
+  inputTokens?: number;
+  availableTokens?: number;
   compiledChatMessages: ChatMessage[];
   didPrune: boolean;
   contextPercentage: number;

@@ -1,3 +1,4 @@
+import { allowToolForSession } from "../../../../redux/slices/sessionSlice";
 import { useAppDispatch, useAppSelector } from "../../../../redux/hooks";
 import { selectPendingToolCalls } from "../../../../redux/selectors/selectToolCalls";
 import { callToolById } from "../../../../redux/thunks/callToolById";
@@ -40,13 +41,24 @@ export function PendingToolCallToolbar() {
       {pendingToolCalls.map((toolCall, index) => (
         <div
           key={toolCall.toolCallId}
-          className="border-input bg-input flex items-center gap-2 rounded border"
+          className="border-input bg-input flex flex-wrap items-center gap-2 rounded border"
         >
           <span className="text-description flex-1 truncate text-xs italic">
             {toolCall.tool?.displayTitle ?? toolCall.toolCall.function.name}
           </span>
 
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Automatically approve this tool until you leave this chat. Excluded tools and command rules still apply."
+              onClick={() => {
+                dispatch(allowToolForSession(toolCall.toolCall.function.name));
+                handleAccept(toolCall.toolCallId);
+              }}
+            >
+              Allow this chat
+            </Button>
             <Button
               variant="ghost"
               size="sm"

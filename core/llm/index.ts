@@ -1330,6 +1330,15 @@ export abstract class BaseLLM implements ILLM {
     return {
       modelTitle: this.title ?? completionOptions.model,
       modelProvider: this.underlyingProviderName,
+      model: completionOptions.model,
+      usage: usage ?? {
+        promptTokens: this.countTokens(prompt),
+        completionTokens: this.countTokens(completion.join("")),
+      },
+      usageEstimated: !usage,
+      usageProvider: this.apiBase?.startsWith("https://api.venice.ai/")
+        ? "venice"
+        : undefined,
       prompt,
       completion: completion.join(""),
     };

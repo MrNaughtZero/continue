@@ -1,3 +1,5 @@
+import { selectAgentBusy } from "../../redux/selectors/selectAgentBusy";
+import { ChatControls } from "./ChatControls";
 import {
   ArrowLeftIcon,
   ChatBubbleOvalLeftIcon,
@@ -32,6 +34,7 @@ import {
   selectPendingToolCalls,
 } from "../../redux/selectors/selectToolCalls";
 import {
+  queueSteering,
   cancelToolCall,
   ChatHistoryItemWithMessageId,
   newSession,
@@ -46,7 +49,6 @@ import { ToolCallDiv } from "./ToolCallDiv";
 import { useStore } from "react-redux";
 import FeedbackDialog from "../../components/dialogs/FeedbackDialog";
 
-import { DeprecationBanner } from "../../components/DeprecationBanner";
 import { FatalErrorIndicator } from "../../components/config/FatalErrorNotice";
 import InlineErrorMessage from "../../components/mainInput/InlineErrorMessage";
 import { resolveEditorContent } from "../../components/mainInput/TipTapEditor/utils/resolveEditorContent";
@@ -173,6 +175,15 @@ export function Chat() {
         stateSnapshot.config.config.selectedModelByRole;
       const currentMode = stateSnapshot.session.mode;
 
+      if (
+        selectAgentBusy(stateSnapshot) &&
+        !isCurrentlyInEdit &&
+        index === undefined
+      ) {
+        dispatch(queueSteering({ editorState, modifiers }));
+        editorToClearOnSend?.commands.clearContent();
+        return;
+      }
       // Cancel all pending tool calls
       latestPendingToolCalls.forEach((toolCallState) => {
         dispatch(
@@ -381,14 +392,14 @@ export function Chat() {
 
   return (
     <>
+      <ChatControls />
       {!!showSessionTabs && !isInEdit && <TabBar ref={tabsRef} />}
       {widget}
 
       <StepsDiv
         ref={stepsDivRef}
-        className={`pt-[8px] ${showScrollbar ? "thin-scrollbar" : "no-scrollbar"} ${history.length > 0 ? "min-h-0 flex-1 overflow-y-scroll" : "shrink-0"}`}
+        className={`min-w-0 max-w-full break-words pt-[8px] ${showScrollbar ? "thin-scrollbar" : "no-scrollbar"} ${history.length > 0 ? "min-h-0 flex-1 overflow-y-scroll" : "shrink-0"}`}
       >
-        <DeprecationBanner dismissable={true} />
         {highlights}
         {history
           .filter((item) => item.message.role !== "system")

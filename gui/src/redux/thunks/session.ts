@@ -76,7 +76,8 @@ export const updateSession = createAsyncThunk<void, Session, ThunkApiType>(
         title: session.title,
       }),
     ); // optimistic session metadata update
-    await extra.ideMessenger.request("history/save", session);
+    const saved = await extra.ideMessenger.request("history/save", session);
+    if (saved.status === "error") throw new Error(saved.error);
     await dispatch(refreshSessionMetadata({}));
   },
 );

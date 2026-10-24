@@ -144,3 +144,26 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+/* Keep streamed reasoning, paths and code inside narrow Cursor panels. */
+.neil-chat-shell,
+.neil-chat-shell > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.neil-chat-shell {
+  overflow-wrap: anywhere;
+}
+.neil-chat-shell pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre;
+}
+.neil-chat-shell table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.neil-chat-shell img {
+  max-width: 100%;
+}

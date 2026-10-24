@@ -15,6 +15,7 @@ import { IIdeMessenger } from "../../../../context/IdeMessenger";
 import { useSubmenuContextProviders } from "../../../../context/SubmenuContextProviders";
 import { useInputHistory } from "../../../../hooks/useInputHistory";
 import useUpdatingRef from "../../../../hooks/useUpdatingRef";
+import { selectAgentBusy } from "../../../../redux/selectors/selectAgentBusy";
 import { useAppSelector } from "../../../../redux/hooks";
 import { selectUseActiveFile } from "../../../../redux/selectors";
 import { selectSelectedChatModel } from "../../../../redux/slices/configSlice";
@@ -85,13 +86,14 @@ export function createEditorConfig(options: {
 
   const { getSubmenuContextItems } = useSubmenuContextProviders();
   const defaultModel = useAppSelector(selectSelectedChatModel);
-  const isStreaming = useAppSelector((state) => state.session.isStreaming);
+  const isStreaming = useAppSelector(selectAgentBusy);
   const useActiveFile = useAppSelector(selectUseActiveFile);
   const historyLength = useAppSelector((store) => store.session.history.length);
   const codeToEdit = useAppSelector((store) => store.editModeState.codeToEdit);
   const isInEdit = useAppSelector((store) => store.session.isInEdit);
   const isInEditRef = useUpdatingRef(isInEdit);
 
+  const steeringEnterRef = useRef({ text: "", at: 0 });
   const inSubmenuRef = useRef<string | undefined>(undefined);
   const inDropdownRef = useRef(false);
   const defaultModelRef = useUpdatingRef(defaultModel);
@@ -236,6 +238,16 @@ export function createEditorConfig(options: {
                 return false;
               }
 
+              if (isStreamingRef.current && props.isMainInput) {
+                const text = JSON.stringify(editor?.getJSON());
+                const last = steeringEnterRef.current;
+                const now = Date.now();
+                if (last.text !== text || now - last.at > 1500) {
+                  steeringEnterRef.current = { text, at: now };
+                  return true;
+                }
+                steeringEnterRef.current = { text: "", at: 0 };
+              }
               onEnter({
                 useCodebase: false,
                 noContext: !useActiveFile,
@@ -391,7 +403,10 @@ export function createEditorConfig(options: {
     if (!editor) {
       return;
     }
-    if (isStreamingRef.current || (codeToEdit.length === 0 && isInEdit)) {
+    if (
+      (isStreamingRef.current && !props.isMainInput) ||
+      (codeToEdit.length === 0 && isInEdit)
+    ) {
       return;
     }
 

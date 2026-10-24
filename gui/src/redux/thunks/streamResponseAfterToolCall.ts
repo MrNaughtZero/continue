@@ -36,11 +36,14 @@ function areAllToolsDoneStreaming(
 
 export const streamResponseAfterToolCall = createAsyncThunk<
   void,
-  { toolCallId: string; depth?: number },
+  { toolCallId: string; depth?: number; continueResponse?: boolean },
   ThunkApiType
 >(
   "chat/streamAfterToolCall",
-  async ({ toolCallId, depth = 0 }, { dispatch, getState }) => {
+  async (
+    { toolCallId, depth = 0, continueResponse = true },
+    { dispatch, getState },
+  ) => {
     await dispatch(
       streamThunkWrapper(async () => {
         const state = getState();
@@ -74,6 +77,7 @@ export const streamResponseAfterToolCall = createAsyncThunk<
         );
 
         if (
+          continueResponse &&
           assistantMessage &&
           areAllToolsDoneStreaming(
             assistantMessage,

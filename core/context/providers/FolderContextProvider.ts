@@ -19,14 +19,38 @@ class FolderContextProvider extends BaseContextProvider {
     displayTitle: "Folder",
     description: "Type to search",
     type: "submenu",
-    dependsOnIndexing: ["embeddings", "fullTextSearch", "chunk"],
   };
 
   async getContextItems(
     query: string,
     extras: ContextProviderExtras,
   ): Promise<ContextItem[]> {
-    return retrieveContextItemsFromEmbeddings(extras, this.options, query);
+    let folderPath = query;
+    try {
+      if (query.startsWith("file:"))
+        folderPath = decodeURIComponent(new URL(query).pathname);
+    } catch {
+      /* Keep original reference. */
+    }
+    const folder: ContextItem = {
+      name: "Selected folder",
+      description: folderPath,
+      content: `The user attached this local directory: ${JSON.stringify(folderPath)}. Use filesystem tools to inspect it. Indexed snippets below are only a partial selection, not the complete folder.`,
+    };
+    try {
+      return [
+        folder,
+        ...(await retrieveContextItemsFromEmbeddings(
+          extras,
+          this.options,
+          query,
+        )),
+      ];
+    } catch {
+      folder.content +=
+        " Indexed retrieval is unavailable; the directory reference remains valid.";
+      return [folder];
+    }
   }
   async loadSubmenuItems(
     args: LoadSubmenuItemsArgs,

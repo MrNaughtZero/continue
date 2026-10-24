@@ -1,3 +1,4 @@
+// UI-only progress actions are covered by steering.test.ts; keep these assertions focused on the original chat flow.
 import { JSONContent } from "@tiptap/core";
 import {
   AssistantChatMessage,
@@ -149,7 +150,16 @@ describe("streamResponseThunk", () => {
     );
 
     // Verify exact sequence of dispatched actions with payloads
-    const dispatchedActions = mockStore.getActions();
+    const dispatchedActions = mockStore
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
 
     expect(dispatchedActions).toEqual([
       {
@@ -584,7 +594,16 @@ describe("streamResponseThunk", () => {
     );
 
     // Verify key actions are dispatched (tool calls trigger a complex cascade, so we verify key actions exist)
-    const dispatchedActions = mockStoreWithToolSettings.getActions();
+    const dispatchedActions = mockStoreWithToolSettings
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
 
     // Verify exact action sequence
     const actionTypes = dispatchedActions.map((action: any) => action.type);
@@ -941,7 +960,16 @@ describe("streamResponseThunk", () => {
     expect(result.type).toBe("chat/streamResponse/fulfilled");
 
     // Verify exact action sequence - should start but then be aborted
-    const dispatchedActions = mockStoreWithAbort.getActions();
+    const dispatchedActions = mockStoreWithAbort
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
     expect(dispatchedActions).toEqual([
       {
         type: "chat/streamResponse/pending",

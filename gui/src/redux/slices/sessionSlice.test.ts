@@ -50,6 +50,9 @@ describe("sessionSlice streamUpdate", () => {
   });
 
   const createInitialState = () => ({
+    sessionToolAllow: {},
+    pendingSteering: [],
+    isModelStreaming: false,
     lastSessionId: undefined,
     allSessionMetadata: [],
     history: [

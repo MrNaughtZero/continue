@@ -201,6 +201,12 @@ export type ChatHistoryItemWithMessageId = ChatHistoryItem & {
 };
 
 type SessionState = {
+  sessionToolAllow: Record<string, boolean>;
+  pendingSteering: {
+    editorState: JSONContent;
+    modifiers: import("core").InputModifiers;
+  }[];
+  isModelStreaming: boolean;
   lastSessionId?: string;
   isSessionMetadataLoading: boolean;
   allSessionMetadata: BaseSessionMetadata[];
@@ -221,11 +227,16 @@ type SessionState = {
   hasReasoningEnabled?: boolean;
   isPruned?: boolean;
   contextPercentage?: number;
+  contextInputTokens?: number;
+  contextAvailableTokens?: number;
   inlineErrorMessage?: InlineErrorMessageType;
   compactionLoading: Record<number, boolean>; // Track compaction loading by message index
 };
 
 export const INITIAL_SESSION_STATE: SessionState = {
+  sessionToolAllow: {},
+  pendingSteering: [],
+  isModelStreaming: false,
   isSessionMetadataLoading: false,
   allSessionMetadata: [],
   history: [],
@@ -249,6 +260,45 @@ export const sessionSlice = createSlice({
   name: "session",
   initialState: INITIAL_SESSION_STATE,
   reducers: {
+    setContextTokenCounts: (
+      state,
+      {
+        payload,
+      }: PayloadAction<{ inputTokens?: number; availableTokens?: number }>,
+    ) => {
+      state.contextInputTokens = payload.inputTokens;
+      state.contextAvailableTokens = payload.availableTokens;
+    },
+    allowToolForSession: (state, { payload }: PayloadAction<string>) => {
+      state.sessionToolAllow[payload] = true;
+    },
+    resetSessionToolAllow: (state) => {
+      state.sessionToolAllow = {};
+    },
+    queueSteering: (
+      state,
+      {
+        payload,
+      }: PayloadAction<{
+        editorState: JSONContent;
+        modifiers: import("core").InputModifiers;
+      }>,
+    ) => {
+      state.pendingSteering.push(payload);
+      if (state.isModelStreaming) {
+        state.streamAborter.abort();
+        state.streamAborter = new AbortController();
+      }
+    },
+    shiftSteering: (state) => {
+      state.pendingSteering.shift();
+    },
+    clearSteering: (state) => {
+      state.pendingSteering = [];
+    },
+    setModelStreaming: (state, { payload }: PayloadAction<boolean>) => {
+      state.isModelStreaming = payload;
+    },
     addPromptCompletionPair: (
       state,
       { payload }: PayloadAction<PromptLog[]>,
@@ -277,6 +327,28 @@ export const sessionSlice = createSlice({
       if (curMessage) {
         curMessage.isGatheringContext = payload;
       }
+    },
+    prepareForSteering: (state) => {
+      // Keep every user request and completed tool result. Only discard the
+      // unfinished generation; cancellation must never remove the original task.
+      const boundary = findLastIndex(
+        state.history,
+        (item) => item.message.role === "user" || item.message.role === "tool",
+      );
+      const tail = state.history
+        .slice(boundary + 1)
+        .filter(
+          (item) => item.message.role === "assistant" && !!item.message.content,
+        );
+      for (const item of tail) {
+        if (item.message.role === "assistant") delete item.message.toolCalls;
+        delete item.toolCallStates;
+        if (item.reasoning) {
+          item.reasoning.active = false;
+          item.reasoning.endAt = Date.now();
+        }
+      }
+      state.history = state.history.slice(0, boundary + 1).concat(tail);
     },
     clearDanglingMessages: (state) => {
       // This is used during cancellation
@@ -434,6 +506,8 @@ export const sessionSlice = createSlice({
         state.inlineErrorMessage = undefined;
         state.isPruned = false;
         state.contextPercentage = undefined;
+        state.contextInputTokens = undefined;
+        state.contextAvailableTokens = undefined;
       }
     },
     deleteMessage: (state, action: PayloadAction<number>) => {
@@ -684,6 +758,9 @@ export const sessionSlice = createSlice({
       }
     },
     newSession: (state, { payload }: PayloadAction<Session | undefined>) => {
+      state.sessionToolAllow = {};
+      state.pendingSteering = [];
+      state.isModelStreaming = false;
       state.lastSessionId = state.id;
 
       state.streamAborter.abort();
@@ -695,6 +772,8 @@ export const sessionSlice = createSlice({
       state.inlineErrorMessage = undefined;
       state.isPruned = false;
       state.contextPercentage = undefined;
+      state.contextInputTokens = undefined;
+      state.contextAvailableTokens = undefined;
 
       if (payload) {
         state.history = payload.history as any;
@@ -1048,6 +1127,13 @@ export const selectApplyStateByToolCallId = createSelector(
 );
 
 export const {
+  setContextTokenCounts,
+  allowToolForSession,
+  resetSessionToolAllow,
+  queueSteering,
+  shiftSteering,
+  clearSteering,
+  setModelStreaming,
   updateFileSymbols,
   setContextItemsAtIndex,
   addContextItemsAtIndex,
@@ -1062,6 +1148,7 @@ export const {
   submitEditorAndInitAtIndex,
   truncateHistoryToMessage,
   updateHistoryItemAtIndex,
+  prepareForSteering,
   clearDanglingMessages,
   setMainEditorContentTrigger,
   deleteMessage,

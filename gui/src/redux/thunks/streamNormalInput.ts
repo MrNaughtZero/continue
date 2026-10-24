@@ -1,3 +1,11 @@
+import { sessionToolPolicies } from "../util/sessionToolPolicies";
+import { streamResponseThunk } from "./streamResponse";
+import {
+  setContextTokenCounts,
+  prepareForSteering,
+  shiftSteering,
+  setModelStreaming,
+} from "../slices/sessionSlice";
 import { createAsyncThunk, unwrapResult } from "@reduxjs/toolkit";
 import { LLMFullCompletionOptions, ModelDescription } from "core";
 import { getRuleId } from "core/llm/rules/getSystemMessageWithRules";
@@ -87,6 +95,18 @@ export const streamNormalInput = createAsyncThunk<
       console.error(message, JSON.stringify(getState(), null, 2));
       throw new Error(message);
     }
+    const sessionId = getState().session.id;
+    const applySteering = async () => {
+      if (getState().session.id !== sessionId) return false;
+      const pending = getState().session.pendingSteering[0];
+      if (!pending) return false;
+      dispatch(shiftSteering());
+      dispatch(prepareForSteering());
+      await dispatch(streamResponseThunk(pending)).unwrap();
+      return true;
+    };
+    if (getState().session.pendingSteering.length && (await applySteering()))
+      return;
     const state = getState();
     const selectedChatModel = selectSelectedChatModel(state);
 
@@ -172,12 +192,20 @@ export const streamNormalInput = createAsyncThunk<
     dispatch(setActive());
     dispatch(setInlineErrorMessage(undefined));
 
+    dispatch(setModelStreaming(true));
     const precompiledRes = await extra.ideMessenger.request("llm/compileChat", {
       messages,
       options: completionOptions,
     });
 
+    if (getState().session.id !== sessionId) return;
+    if (state.session.streamAborter.signal.aborted) {
+      dispatch(setModelStreaming(false));
+      await applySteering();
+      return;
+    }
     if (precompiledRes.status === "error") {
+      dispatch(setModelStreaming(false));
       if (precompiledRes.error.includes("Not enough context")) {
         dispatch(setInlineErrorMessage("out-of-context"));
         dispatch(setInactive());
@@ -192,6 +220,7 @@ export const streamNormalInput = createAsyncThunk<
 
     dispatch(setIsPruned(didPrune));
     dispatch(setContextPercentage(contextPercentage));
+    dispatch(setContextTokenCounts(precompiledRes.content));
 
     const start = Date.now();
     const streamAborter = state.session.streamAborter;
@@ -216,8 +245,22 @@ export const streamNormalInput = createAsyncThunk<
 
       let next = await gen.next();
       while (!next.done) {
-        if (!getState().session.isStreaming) {
-          dispatch(abortStream());
+        if (
+          getState().session.id !== sessionId ||
+          streamAborter.signal.aborted ||
+          !getState().session.isStreaming
+        ) {
+          if (
+            getState().session.id === sessionId &&
+            !streamAborter.signal.aborted
+          )
+            dispatch(abortStream());
+          await gen.return({
+            modelTitle: "",
+            modelProvider: "",
+            prompt: "",
+            completion: "",
+          });
           break;
         }
 
@@ -226,7 +269,12 @@ export const streamNormalInput = createAsyncThunk<
       }
 
       // Attach prompt log and end thinking for reasoning models
-      if (next.done && next.value) {
+      if (
+        next.done &&
+        next.value &&
+        getState().session.id === sessionId &&
+        !streamAborter.signal.aborted
+      ) {
         dispatch(addPromptCompletionPair([next.value]));
 
         try {
@@ -255,31 +303,39 @@ export const streamNormalInput = createAsyncThunk<
         }
       }
     } catch (e) {
-      const toolCallsToCancel = selectCurrentToolCalls(getState());
-      if (
-        toolCallsToCancel.length > 0 &&
-        e instanceof Error &&
-        e.message.toLowerCase().includes("premature close")
-      ) {
-        for (const tc of toolCallsToCancel) {
-          dispatch(
-            errorToolCall({
-              toolCallId: tc.toolCallId,
-              output: [
-                {
-                  name: "Tool Call Error",
-                  description: "Premature Close",
-                  content: `"Premature Close" error: this tool call was aborted mid-stream because the arguments took too long to stream or there were network issues. Please re-attempt by breaking the operation into smaller chunks or trying something else`,
-                  icon: "problems",
-                },
-              ],
-            }),
-          );
-        }
+      if (streamAborter.signal.aborted || getState().session.id !== sessionId) {
+        // Steering and Stop are intentional cancellation, not model failures.
       } else {
-        throw e;
+        const toolCallsToCancel = selectCurrentToolCalls(getState());
+        if (
+          toolCallsToCancel.length > 0 &&
+          e instanceof Error &&
+          e.message.toLowerCase().includes("premature close")
+        ) {
+          for (const tc of toolCallsToCancel) {
+            dispatch(
+              errorToolCall({
+                toolCallId: tc.toolCallId,
+                output: [
+                  {
+                    name: "Tool Call Error",
+                    description: "Premature Close",
+                    content: `"Premature Close" error: this tool call was aborted mid-stream because the arguments took too long to stream or there were network issues. Please re-attempt by breaking the operation into smaller chunks or trying something else`,
+                    icon: "problems",
+                  },
+                ],
+              }),
+            );
+          }
+        } else {
+          throw e;
+        }
       }
     }
+    if (getState().session.id !== sessionId) return;
+    dispatch(setModelStreaming(false));
+    if (getState().session.pendingSteering.length && (await applySteering()))
+      return;
 
     // Tool call sequence:
     // 1. Mark generating tool calls as generated
@@ -314,7 +370,10 @@ export const streamNormalInput = createAsyncThunk<
       return;
     }
     const generatedCalls3 = selectPendingToolCalls(state3);
-    const toolPolicies = state3.ui.toolSettings;
+    const toolPolicies = sessionToolPolicies(
+      state3.ui.toolSettings,
+      state3.session.sessionToolAllow,
+    );
     const policies = await evaluateToolPolicies(
       dispatch,
       extra.ideMessenger,

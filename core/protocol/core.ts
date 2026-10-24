@@ -61,6 +61,7 @@ export interface ListHistoryOptions {
 }
 
 export type ToCoreFromIdeOrWebviewProtocol = {
+  "venice/account": [undefined, import("../util/veniceAccount").VeniceAccount];
   // Special
   ping: [string, string];
   abort: [undefined, void];

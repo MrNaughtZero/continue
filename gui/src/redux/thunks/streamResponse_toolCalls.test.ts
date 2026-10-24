@@ -1,3 +1,4 @@
+// UI-only progress actions are covered by steering.test.ts; keep these assertions focused on the original chat flow.
 import { JSONContent } from "@tiptap/core";
 import { AssistantChatMessage, InputModifiers, PromptLog } from "core";
 import { describe, expect, it, vi } from "vitest";
@@ -246,7 +247,16 @@ describe("streamResponseThunk - tool calls", () => {
     expect(streamingStateChanges).toEqual([false, true, false]);
 
     // Verify key actions are dispatched (tool calls trigger a complex cascade, so we verify key actions exist)
-    const dispatchedActions = mockStoreWithToolSettings.getActions();
+    const dispatchedActions = mockStoreWithToolSettings
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
 
     // Verify exact action sequence
     const actionTypes = dispatchedActions.map((action: any) => action.type);
@@ -646,7 +656,16 @@ describe("streamResponseThunk - tool calls", () => {
     expect(finalStreamingState).toBe(false); // Final state should be false since we're waiting for approval
 
     // Verify exact action sequence includes tool generation but NO execution
-    const dispatchedActions = mockStoreWithManualApproval.getActions();
+    const dispatchedActions = mockStoreWithManualApproval
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
     expect(dispatchedActions).toEqual([
       {
         type: "chat/streamResponse/pending",
@@ -1199,7 +1218,16 @@ describe("streamResponseThunk - tool calls", () => {
     expect(initialResult.type).toBe("chat/streamResponse/fulfilled");
 
     // Verify exact initial action sequence by comparing action types
-    const initialActions = mockStoreWithApproval.getActions();
+    const initialActions = mockStoreWithApproval
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
 
     expect(initialActions).toEqual([
       {
@@ -1484,7 +1512,16 @@ describe("streamResponseThunk - tool calls", () => {
     expect(approvalResult.type).toBe("chat/callTool/fulfilled");
 
     // Verify exact approval flow actions
-    const approvalActions = mockStoreWithApproval.getActions();
+    const approvalActions = mockStoreWithApproval
+      .getActions()
+      .filter(
+        (action) =>
+          ![
+            "session/setModelStreaming",
+            "session/setContextTokenCounts",
+            "session/clearSteering",
+          ].includes(action.type),
+      );
     expect(approvalActions).toEqual([
       {
         type: "chat/callTool/pending",

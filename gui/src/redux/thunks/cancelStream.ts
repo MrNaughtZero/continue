@@ -1,6 +1,8 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import {
   abortStream,
+  clearSteering,
+  setModelStreaming,
   clearDanglingMessages,
   setInactive,
 } from "../slices/sessionSlice";
@@ -9,6 +11,8 @@ import { ThunkApiType } from "../store";
 export const cancelStream = createAsyncThunk<void, undefined, ThunkApiType>(
   "chat/cancelStream",
   async (messages, { dispatch, extra, getState }) => {
+    dispatch(clearSteering());
+    dispatch(setModelStreaming(false));
     dispatch(setInactive());
     dispatch(abortStream());
 
