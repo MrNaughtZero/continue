@@ -347,6 +347,33 @@ export function fromChatResponse(response: ChatCompletion): ChatMessage[] {
 export function fromChatCompletionChunk(
   chunk: ChatCompletionChunk,
 ): ChatMessage | undefined {
+  const message = fromChatCompletionDelta(chunk);
+  if (!chunk.usage) return message;
+  const usage = {
+    promptTokens: chunk.usage.prompt_tokens,
+    completionTokens: chunk.usage.completion_tokens,
+    promptTokensDetails: {
+      cachedTokens: chunk.usage.prompt_tokens_details?.cached_tokens,
+      audioTokens: chunk.usage.prompt_tokens_details?.audio_tokens,
+    },
+    completionTokensDetails: {
+      reasoningTokens: chunk.usage.completion_tokens_details?.reasoning_tokens,
+      audioTokens: chunk.usage.completion_tokens_details?.audio_tokens,
+      acceptedPredictionTokens:
+        chunk.usage.completion_tokens_details?.accepted_prediction_tokens,
+      rejectedPredictionTokens:
+        chunk.usage.completion_tokens_details?.rejected_prediction_tokens,
+    },
+  };
+  // Providers commonly send usage in a final chunk with no choices.
+  if (!message) return { role: "assistant", content: "", usage };
+  if (message.role === "assistant") return { ...message, usage };
+  return message;
+}
+
+function fromChatCompletionDelta(
+  chunk: ChatCompletionChunk,
+): ChatMessage | undefined {
   const delta = chunk.choices?.[0]?.delta as
     | (ChatCompletionChunk.Choice.Delta & {
         reasoning?: string;
