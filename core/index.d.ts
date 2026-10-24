@@ -364,6 +364,7 @@ export interface ToolCall {
 
 export interface ToolCallDelta {
   id?: string;
+  index?: number;
   type?: "function";
   function?: {
     name?: string;
@@ -519,6 +520,7 @@ interface McpUiState {
 // Will exist only on "assistant" messages with tool calls
 interface ToolCallState {
   toolCallId: string;
+  toolCallIndex?: number;
   toolCall: ToolCall;
   status: ToolStatus;
   parsedArgs: any;

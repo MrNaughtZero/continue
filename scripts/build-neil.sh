@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+npm run build --prefix packages/openai-adapters
 npm run build --prefix gui
 cd extensions/vscode
 SKIP_INSTALLS=true node scripts/prepackage.js --target darwin-arm64

@@ -20,10 +20,18 @@ export async function preprocessToolCalls(
       let errorReason: ContinueErrorReason | undefined = undefined;
       let errorMessage: string | undefined = undefined;
       let preprocessedArgs: Record<string, unknown> | undefined = undefined;
-      const result = await ideMessenger.request("tools/preprocessArgs", {
-        toolName: tcState.toolCall.function.name,
-        args: tcState.parsedArgs,
-      });
+      const incomplete =
+        !tcState.toolCall.function.name?.trim() || !tcState.toolCall.id;
+      const result = incomplete
+        ? {
+            status: "error" as const,
+            error:
+              "The model returned an incomplete tool call (missing tool name or call ID). No tool was executed. Retry with an available tool's exact name and a new call ID.",
+          }
+        : await ideMessenger.request("tools/preprocessArgs", {
+            toolName: tcState.toolCall.function.name,
+            args: tcState.parsedArgs,
+          });
       if (result.status === "success") {
         preprocessedArgs = result.content.preprocessedArgs;
         errorMessage = result.content.errorMessage;
@@ -46,7 +54,9 @@ export async function preprocessToolCalls(
                 icon: "problems",
                 name: "Invalid Tool Call",
                 description: "",
-                content: `${tcState.toolCall.function.name} failed because the arguments were invalid, with the following message: ${errorMessage}\n\nPlease try something else or request further instructions.`,
+                content: incomplete
+                  ? errorMessage!
+                  : `${tcState.toolCall.function.name} could not be prepared: ${errorMessage}\n\nPlease try something else or request further instructions.`,
                 hidden: false,
               },
             ],

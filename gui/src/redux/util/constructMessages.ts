@@ -122,15 +122,28 @@ export function constructMessages(
         continue;
       }
 
+      const incompleteCalls =
+        item.toolCallStates?.filter(
+          ({ toolCall }) => !toolCall.id || !toolCall.function.name?.trim(),
+        ) ?? [];
+      const validCalls = item.message.toolCalls?.filter(
+        (call) => call.id && call.function?.name?.trim(),
+      );
       msgs.push({
         ctxItems: item.contextItems,
-        message: item.message,
+        message: incompleteCalls.length
+          ? {
+              ...item.message,
+              toolCalls: validCalls?.length ? validCalls : undefined,
+            }
+          : item.message,
       });
 
       // Add a tool message for each tool call
       if (item.toolCallStates?.length) {
         // If the assistant message has tool calls, we need to insert tool messages
         for (const toolCallState of item.toolCallStates) {
+          if (incompleteCalls.includes(toolCallState)) continue;
           const { output, status, toolCall } = toolCallState;
           let content: string = NO_TOOL_CALL_OUTPUT_MESSAGE;
 
@@ -171,6 +184,18 @@ export function constructMessages(
                 : "Non-string content",
           },
         );
+      }
+      if (incompleteCalls.length) {
+        // Malformed historical calls cannot be sent as native tool/result
+        // pairs. Give the model a repair instruction without inventing a tool.
+        msgs.push({
+          ctxItems: [],
+          message: {
+            role: "user",
+            content:
+              "A previous tool call was incomplete (missing tool name or call ID) and was not executed. Retry using an available tool's exact name and a new call ID. Do not repeat the incomplete call.",
+          },
+        });
       }
     }
   }

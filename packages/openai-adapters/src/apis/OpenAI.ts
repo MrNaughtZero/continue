@@ -159,19 +159,10 @@ export class OpenAIApi implements BaseLlmApi {
         signal,
       },
     );
-    let lastChunkWithUsage: ChatCompletionChunk | undefined;
     for await (const result of response) {
-      // Check if this chunk contains usage information
-      if (result.usage) {
-        // Store it to emit after all content chunks
-        lastChunkWithUsage = result;
-      } else {
-        yield result;
-      }
-    }
-    // Emit the usage chunk at the end if we have one
-    if (lastChunkWithUsage) {
-      yield lastChunkWithUsage;
+      // Usage can accompany tool headers/content, not just the final chunk.
+      // Preserve every delta in order instead of keeping only the last one.
+      yield result;
     }
   }
   async completionNonStream(

@@ -127,7 +127,12 @@ function applyToolCallDelta(
     existingStateIndex = toolCallStates.findIndex(
       (state) => state.toolCallId === toolCallDelta.id,
     );
-  } else {
+  }
+  if (existingStateIndex < 0 && toolCallDelta.index !== undefined) {
+    existingStateIndex = toolCallStates.findIndex(
+      (state) => state.toolCallIndex === toolCallDelta.index,
+    );
+  } else if (!toolCallDelta.id && toolCallDelta.index === undefined) {
     // No ID in delta (common in OpenAI streaming fragments)
     // Strategy: Update the most recently added tool call that's still being generated
     // This handles the pattern: initial tool call with ID, then fragments without ID
@@ -719,7 +724,10 @@ export const sessionSlice = createSlice({
             if (lastMessage.role === "thinking") {
               lastMessage.signature = message.signature;
             }
-          } else if (
+          }
+          // A streamed delta can contain both visible text and a tool header.
+          // Preserve both; later argument-only chunks need that header.
+          if (
             message.role === "assistant" &&
             message.toolCalls?.length &&
             lastMessage.role === "assistant"

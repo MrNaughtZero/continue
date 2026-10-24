@@ -15,6 +15,7 @@ export function addToolCallDeltaToState(
   if (
     currentState &&
     toolCallDelta.id &&
+    currentCall?.id &&
     currentCall?.id !== toolCallDelta.id
   ) {
     return currentState;
@@ -65,6 +66,7 @@ export function addToolCallDeltaToState(
       },
     },
     toolCallId: callId,
+    toolCallIndex: toolCallDelta.index ?? currentState?.toolCallIndex,
     parsedArgs,
   };
 }
