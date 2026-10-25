@@ -1,4 +1,4 @@
-import { inferResolvedUriFromRelativePath } from "../../util/ideUtils";
+import { resolveCreateFileUri } from "../policies/workspaceFiles";
 
 import { ToolImpl } from ".";
 import { throwIfFileIsSecurityConcern } from "../../indexing/ignore";
@@ -10,10 +10,7 @@ export const createNewFileImpl: ToolImpl = async (args, extras) => {
   const filepath = getStringArg(args, "filepath");
   const contents = getStringArg(args, "contents", true);
 
-  const resolvedFileUri = await inferResolvedUriFromRelativePath(
-    filepath,
-    extras.ide,
-  );
+  const resolvedFileUri = await resolveCreateFileUri(extras.ide, filepath);
   if (resolvedFileUri) {
     throwIfFileIsSecurityConcern(getCleanUriPath(resolvedFileUri));
     const exists = await extras.ide.fileExists(resolvedFileUri);

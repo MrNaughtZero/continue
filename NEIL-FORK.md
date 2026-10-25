@@ -18,6 +18,14 @@ local improvements while retaining Continue's existing session format and
   **Allow terminal this chat** toggle enables the same mode without running a
   pending command; click it again to restore prompts. Existing global tool settings
   remain available in Tools.
+- **Allow workspace files this chat** grants reading, creating and editing files
+  within the currently open local workspace folders. Completed agent edits are
+  accepted automatically too. It also handles pending file requests and edits.
+  Click again or **Reset permissions** to revoke it. New/opened chats and reloads
+  clear it. File paths are checked against the approved workspace roots, including
+  resolved symlinks; outside files still require approval. Changing workspace
+  roots invalidates the grant. Disabled tools remain disabled. Remote workspaces
+  are not supported by this local-files grant.
 - Web requests offer **Allow web for chat**, covering both search and reading URLs.
   **Allow Playwright for chat** covers all enabled tools on the configured
   **Chrome (Playwright)** server. These are the primary acceptance actions,

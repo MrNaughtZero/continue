@@ -1,3 +1,4 @@
+import { allowWorkspaceFilesForChat } from "../../redux/thunks/allowWorkspaceFilesForChat";
 import { Button } from "../../components/ui";
 import { BuiltInToolNames } from "core/tools/builtIn";
 import { selectActiveTools } from "../../redux/selectors/selectActiveTools";
@@ -9,6 +10,7 @@ import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import {
   newSession,
+  setWorkspaceFileApproval,
   allowToolForSession,
   revokeToolForSession,
   resetSessionToolAllow,
@@ -32,6 +34,8 @@ export function ChatControls() {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [grantingFiles, setGrantingFiles] = useState(false);
+  const workspaceFilesAllowed = !!session.workspaceFileApprovalRoots?.length;
   const refresh = async () => {
     setBusy(true);
     try {
@@ -161,6 +165,34 @@ export function ChatControls() {
               : "Allow terminal this chat"}
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-pressed={workspaceFilesAllowed}
+          disabled={grantingFiles}
+          title="Allow reading, creating and editing files inside this local workspace, and automatically accept those file changes. Outside files still require approval. Resets when you switch chats or reload; changing workspace folders invalidates the grant."
+          onClick={async () => {
+            if (workspaceFilesAllowed) {
+              dispatch(setWorkspaceFileApproval(undefined));
+              return;
+            }
+            setGrantingFiles(true);
+            try {
+              await dispatch(allowWorkspaceFilesForChat()).unwrap();
+              setNotice("");
+            } catch {
+              setNotice(
+                "Could not enable workspace file access. Open a local folder and try again.",
+              );
+            } finally {
+              setGrantingFiles(false);
+            }
+          }}
+        >
+          {workspaceFilesAllowed
+            ? "Workspace files: auto · this chat"
+            : "Allow workspace files this chat"}
+        </Button>
         {agentBusy && (
           <Button
             variant="ghost"
@@ -172,10 +204,11 @@ export function ChatControls() {
         )}
       </div>
       {notice && <div role="alert">{notice}</div>}
-      {Object.keys(session.sessionToolAllow).length > 0 && (
+      {(Object.keys(session.sessionToolAllow).length > 0 ||
+        workspaceFilesAllowed) && (
         <div className="mt-1">
           {Object.keys(session.sessionToolAllow).length} tool(s) allowed for
-          this chat ·{" "}
+          this chat{workspaceFilesAllowed ? " · Workspace files allowed" : ""} ·{" "}
           <Button
             variant="ghost"
             size="sm"

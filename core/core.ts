@@ -1,3 +1,5 @@
+import { isWorkspaceFileApproved } from "./tools/policies/workspaceFiles";
+import { WORKSPACE_FILE_TOOLS } from "./tools/workspaceFileTools";
 import { getVeniceAccount } from "./util/veniceAccount";
 import { withWorkspaceContext } from "./llm/workspaceContext";
 import { fetchwithRequestOptions } from "@continuedev/fetch";
@@ -1062,7 +1064,16 @@ export class Core {
 
     on(
       "tools/evaluatePolicy",
-      async ({ data: { toolName, basePolicy, parsedArgs, processedArgs } }) => {
+      async ({
+        data: {
+          toolName,
+          basePolicy,
+          parsedArgs,
+          processedArgs,
+          workspaceFileApprovalRoots,
+          workspaceFileUri,
+        },
+      }) => {
         const { config } = await this.configHandler.loadConfig();
         if (!config) {
           throw new Error("Config not loaded");
@@ -1071,6 +1082,31 @@ export class Core {
         const tool = config.tools.find((t) => t.function.name === toolName);
         if (!tool) {
           return { policy: basePolicy };
+        }
+
+        if (
+          workspaceFileApprovalRoots &&
+          WORKSPACE_FILE_TOOLS.includes(toolName)
+        ) {
+          const workspaceFileApproved =
+            basePolicy !== "disabled" &&
+            !tool.uri &&
+            (await isWorkspaceFileApproved(
+              this.ide,
+              toolName,
+              parsedArgs,
+              workspaceFileApprovalRoots,
+              workspaceFileUri,
+            ));
+          return {
+            policy:
+              basePolicy === "disabled"
+                ? ("disabled" as const)
+                : workspaceFileApproved
+                  ? ("allowedWithoutPermission" as const)
+                  : ("allowedWithPermission" as const),
+            workspaceFileApproved,
+          };
         }
 
         // Extract display value for specific tools

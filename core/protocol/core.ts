@@ -316,8 +316,14 @@ export type ToCoreFromIdeOrWebviewProtocol = {
       basePolicy: ToolPolicy;
       parsedArgs: Record<string, unknown>;
       processedArgs?: Record<string, unknown>;
+      workspaceFileApprovalRoots?: string[];
+      workspaceFileUri?: string;
     },
-    { policy: ToolPolicy; displayValue?: string },
+    {
+      policy: ToolPolicy;
+      displayValue?: string;
+      workspaceFileApproved?: boolean;
+    },
   ];
   "tools/preprocessArgs": [
     { toolName: string; args: Record<string, unknown> },

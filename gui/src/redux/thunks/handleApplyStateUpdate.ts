@@ -1,3 +1,5 @@
+import { selectActiveTools } from "../selectors/selectActiveTools";
+import { WORKSPACE_FILE_TOOLS } from "core/tools/workspaceFileTools";
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { ApplyState, ApplyToFilePayload } from "core";
 import { EDIT_MODE_STREAM_ID } from "core/edit/constants";
@@ -51,14 +53,69 @@ export const handleApplyStateUpdate = createAsyncThunk<
 
         if (
           applyState.status === "done" &&
-          toolCallState?.toolCall.function.name &&
-          getState().ui.toolSettings[toolCallState.toolCall.function.name] ===
-            "allowedWithoutPermission"
+          toolCallState?.toolCall.function.name
         ) {
-          extra.ideMessenger.post("acceptDiff", {
-            streamId: applyState.streamId,
-            filepath: applyState.filepath,
-          });
+          const state = getState();
+          const name = toolCallState.toolCall.function.name;
+          const roots = state.session.workspaceFileApprovalRoots;
+          let autoAccept =
+            state.ui.toolSettings[name] === "allowedWithoutPermission";
+          if (roots && WORKSPACE_FILE_TOOLS.includes(name)) {
+            autoAccept = false;
+            const tool = selectActiveTools(state).find(
+              (tool) => tool.function.name === name,
+            );
+            if (
+              tool &&
+              applyState.filepath &&
+              toolCallState.status !== "canceled" &&
+              toolCallState.status !== "errored"
+            ) {
+              try {
+                const result = await extra.ideMessenger.request(
+                  "tools/evaluatePolicy",
+                  {
+                    toolName: name,
+                    basePolicy:
+                      state.ui.toolSettings[name] ??
+                      tool.defaultToolPolicy ??
+                      "allowedWithPermission",
+                    parsedArgs: toolCallState.parsedArgs,
+                    workspaceFileApprovalRoots: roots,
+                    workspaceFileUri: applyState.filepath,
+                  },
+                );
+                const current = getState();
+                const currentTool = findToolCallById(
+                  current.session.history,
+                  applyState.toolCallId,
+                );
+                autoAccept =
+                  result.status === "success" &&
+                  result.content.workspaceFileApproved === true &&
+                  result.content.policy === "allowedWithoutPermission" &&
+                  current.session.id === state.session.id &&
+                  current.session.workspaceFileApprovalRoots === roots &&
+                  currentTool?.status === "calling" &&
+                  selectActiveTools(current).some(
+                    (tool) => tool.function.name === name,
+                  ) &&
+                  current.session.codeBlockApplyStates.states.some(
+                    (apply) =>
+                      apply.streamId === applyState.streamId &&
+                      apply.status === "done",
+                  );
+              } catch {
+                /* Keep the diff waiting for review if the path check fails. */
+              }
+            }
+          }
+          if (autoAccept) {
+            extra.ideMessenger.post("acceptDiff", {
+              streamId: applyState.streamId,
+              filepath: applyState.filepath,
+            });
+          }
         }
 
         if (applyState.status === "closed") {
