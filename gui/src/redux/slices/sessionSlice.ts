@@ -207,7 +207,6 @@ export type ChatHistoryItemWithMessageId = ChatHistoryItem & {
 
 type SessionState = {
   sessionToolAllow: Record<string, boolean>;
-  workspaceFileApprovalRoots?: string[];
   pendingSteering: {
     editorState: JSONContent;
     modifiers: import("core").InputModifiers;
@@ -275,12 +274,6 @@ export const sessionSlice = createSlice({
       state.contextInputTokens = payload.inputTokens;
       state.contextAvailableTokens = payload.availableTokens;
     },
-    setWorkspaceFileApproval: (
-      state,
-      { payload }: PayloadAction<string[] | undefined>,
-    ) => {
-      state.workspaceFileApprovalRoots = payload;
-    },
     allowToolForSession: (state, { payload }: PayloadAction<string>) => {
       state.sessionToolAllow[payload] = true;
     },
@@ -289,7 +282,6 @@ export const sessionSlice = createSlice({
     },
     resetSessionToolAllow: (state) => {
       state.sessionToolAllow = {};
-      state.workspaceFileApprovalRoots = undefined;
     },
     queueSteering: (
       state,
@@ -778,7 +770,6 @@ export const sessionSlice = createSlice({
     },
     newSession: (state, { payload }: PayloadAction<Session | undefined>) => {
       state.sessionToolAllow = {};
-      state.workspaceFileApprovalRoots = undefined;
       state.pendingSteering = [];
       state.isModelStreaming = false;
       state.lastSessionId = state.id;
@@ -1147,7 +1138,6 @@ export const selectApplyStateByToolCallId = createSelector(
 );
 
 export const {
-  setWorkspaceFileApproval,
   setContextTokenCounts,
   allowToolForSession,
   revokeToolForSession,

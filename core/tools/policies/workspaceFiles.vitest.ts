@@ -49,13 +49,40 @@ describe("local workspace file grant", () => {
       T.MultiEdit,
     ]) {
       expect(await approve(name, "file.txt")).toBe(true);
-      expect(await approve(name, "file.txt")).toBe(true);
+      expect(await approve(name, path.join(root, "file.txt"))).toBe(true);
+      expect(await approve(name, uri(path.join(root, "file.txt")))).toBe(true);
     }
     expect(await approve(T.ReadFile, path.join(root, "file.txt"))).toBe(true);
     expect(await approve(T.ReadFile, uri(path.join(root, "file.txt")))).toBe(
       true,
     );
     expect(await approve(T.ReadCurrentlyOpenFile, "")).toBe(true);
+  });
+  it("automatically grants the current workspace without a session snapshot, including directory listings", async () => {
+    for (const dirPath of [undefined, ".", root, uri(root)]) {
+      expect(await isWorkspaceFileApproved(ide, T.LSTool, { dirPath })).toBe(
+        true,
+      );
+    }
+    expect(
+      await isWorkspaceFileApproved(ide, T.LSTool, { dirPath: temp }),
+    ).toBe(false);
+    expect(
+      await isWorkspaceFileApproved(ide, T.ReadFile, { filepath: "file.txt" }),
+    ).toBe(true);
+    const secondRoot = path.join(temp, "project-other");
+    await fs.writeFile(path.join(secondRoot, "second.txt"), "second workspace");
+    vi.mocked(ide.getWorkspaceDirs).mockResolvedValue([uri(secondRoot)]);
+    expect(
+      await isWorkspaceFileApproved(ide, T.ReadFile, {
+        filepath: "second.txt",
+      }),
+    ).toBe(true);
+    expect(
+      await isWorkspaceFileApproved(ide, T.ReadFile, {
+        filepath: path.join(root, "file.txt"),
+      }),
+    ).toBe(false);
   });
   it("allows new nested files and preserves absolute create paths", async () => {
     const target = path.join(root, "new", "nested", "file.txt");

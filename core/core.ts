@@ -1,5 +1,4 @@
-import { isWorkspaceFileApproved } from "./tools/policies/workspaceFiles";
-import { WORKSPACE_FILE_TOOLS } from "./tools/workspaceFileTools";
+import { defaultLocalPermissions } from "./tools/policies/defaultLocalPermissions";
 import { getVeniceAccount } from "./util/veniceAccount";
 import { withWorkspaceContext } from "./llm/workspaceContext";
 import { fetchwithRequestOptions } from "@continuedev/fetch";
@@ -1070,7 +1069,6 @@ export class Core {
           basePolicy,
           parsedArgs,
           processedArgs,
-          workspaceFileApprovalRoots,
           workspaceFileUri,
         },
       }) => {
@@ -1084,30 +1082,15 @@ export class Core {
           return { policy: basePolicy };
         }
 
-        if (
-          workspaceFileApprovalRoots &&
-          WORKSPACE_FILE_TOOLS.includes(toolName)
-        ) {
-          const workspaceFileApproved =
-            basePolicy !== "disabled" &&
-            !tool.uri &&
-            (await isWorkspaceFileApproved(
-              this.ide,
-              toolName,
-              parsedArgs,
-              workspaceFileApprovalRoots,
-              workspaceFileUri,
-            ));
-          return {
-            policy:
-              basePolicy === "disabled"
-                ? ("disabled" as const)
-                : workspaceFileApproved
-                  ? ("allowedWithoutPermission" as const)
-                  : ("allowedWithPermission" as const),
-            workspaceFileApproved,
-          };
-        }
+        const localPolicy = await defaultLocalPermissions(
+          this.ide,
+          tool,
+          basePolicy,
+          parsedArgs,
+          processedArgs,
+          workspaceFileUri,
+        );
+        if (localPolicy) return localPolicy;
 
         // Extract display value for specific tools
         let displayValue: string | undefined;

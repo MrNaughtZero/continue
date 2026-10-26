@@ -1,18 +1,13 @@
+import { setToolPolicy } from "../slices/uiSlice";
 import { describe, expect, it, vi } from "vitest";
 import { Tool, ToolCallState } from "core";
 import { BuiltInToolNames as T } from "core/tools/builtIn";
 import { createMockStore, getEmptyRootState } from "../../util/test/mockStore";
 import { IIdeMessenger } from "../../context/IdeMessenger";
-import {
-  newSession,
-  resetSessionToolAllow,
-  setWorkspaceFileApproval,
-} from "../slices/sessionSlice";
+import { newSession, resetSessionToolAllow } from "../slices/sessionSlice";
 import { evaluateToolPolicies } from "./evaluateToolPolicies";
 import { handleApplyStateUpdate } from "./handleApplyStateUpdate";
-import { allowWorkspaceFilesForChat } from "./allowWorkspaceFilesForChat";
 
-const roots = ["file:///workspace"];
 const name = T.EditExistingFile;
 const tool = {
   type: "function",
@@ -37,11 +32,11 @@ const apply = {
   status: "done" as const,
   filepath: "file:///workspace/file.txt",
 };
-function setup(granted = true) {
+function setup() {
   const state = getEmptyRootState();
   state.session.mode = "agent";
+  state.session.streamAborter.abort = vi.fn();
   state.config.config.tools = [tool];
-  state.session.workspaceFileApprovalRoots = granted ? roots : undefined;
   state.session.history = [
     {
       message: {
@@ -81,13 +76,9 @@ describe("workspace file approval and automatic acceptance", () => {
         [call],
         {},
         false,
-        roots,
       );
       expect(result[0].policy).toBe(
         approved ? "allowedWithoutPermission" : "allowedWithPermission",
-      );
-      expect(request.mock.calls[0][1].workspaceFileApprovalRoots).toEqual(
-        roots,
       );
     }
   });
@@ -106,7 +97,6 @@ describe("workspace file approval and automatic acceptance", () => {
       [call],
       { [name]: "disabled" },
       false,
-      roots,
     );
     expect(result[0].policy).toBe("disabled");
   });
@@ -118,7 +108,6 @@ describe("workspace file approval and automatic acceptance", () => {
       "tools/evaluatePolicy",
       expect.objectContaining({
         workspaceFileUri: apply.filepath,
-        workspaceFileApprovalRoots: roots,
       }),
     );
     expect(post).toHaveBeenCalledWith("acceptDiff", {
@@ -126,19 +115,23 @@ describe("workspace file approval and automatic acceptance", () => {
       filepath: apply.filepath,
     });
   });
-  it("leaves edits pending without a grant or outside the approved roots", async () => {
-    for (const granted of [true, false]) {
-      const { store, post } = setup(granted);
-      store.mockIdeMessenger.responses["tools/evaluatePolicy"] = {
-        policy: "allowedWithPermission",
-        workspaceFileApproved: false,
-      };
-      await store.dispatch(handleApplyStateUpdate(apply) as any);
-      expect(post).not.toHaveBeenCalledWith("acceptDiff", expect.anything());
-    }
+  it("leaves edits outside the workspace pending even with a global auto setting", async () => {
+    const { store, post } = setup();
+    store.dispatch(
+      setToolPolicy({ toolName: name, policy: "allowedWithoutPermission" }),
+    );
+    store.mockIdeMessenger.responses["tools/evaluatePolicy"] = {
+      policy: "allowedWithPermission",
+      workspaceFileApproved: false,
+    };
+    await store.dispatch(handleApplyStateUpdate(apply) as any);
+    expect(post).not.toHaveBeenCalledWith("acceptDiff", expect.anything());
   });
-  it("does not accept if the grant is revoked or the chat changes during the check", async () => {
-    for (const action of [setWorkspaceFileApproval(undefined), newSession()]) {
+  it("does not accept if the tool is disabled or the chat changes during the check", async () => {
+    for (const action of [
+      setToolPolicy({ toolName: name, policy: "disabled" }),
+      newSession(),
+    ]) {
       const { store, post } = setup();
       store.mockIdeMessenger.responseHandlers["tools/evaluatePolicy"] =
         async () => {
@@ -152,30 +145,40 @@ describe("workspace file approval and automatic acceptance", () => {
       expect(post).not.toHaveBeenCalledWith("acceptDiff", expect.anything());
     }
   });
-  it("grants local roots and accepts an already pending edit", async () => {
-    const { store, post } = setup(false);
-    await store.dispatch(handleApplyStateUpdate(apply) as any);
-    store.mockIdeMessenger.responses.getWorkspaceDirs = roots;
-    store.mockIdeMessenger.responses.isWorkspaceRemote = false;
-    await store.dispatch(allowWorkspaceFilesForChat() as any);
-    expect(
-      (store.getState() as any).session.workspaceFileApprovalRoots,
-    ).toEqual(roots);
-    expect(post).toHaveBeenCalledWith("acceptDiff", {
-      streamId: apply.streamId,
-      filepath: apply.filepath,
-    });
-  });
-  it("clears on reset or a new chat", () => {
+  it("uses automatic file permission after new chats and permission resets with no session toggle", async () => {
     const { store } = setup();
-    store.dispatch(resetSessionToolAllow());
-    expect(
-      (store.getState() as any).session.workspaceFileApprovalRoots,
-    ).toBeUndefined();
-    store.dispatch(setWorkspaceFileApproval(roots));
-    store.dispatch(newSession());
-    expect(
-      (store.getState() as any).session.workspaceFileApprovalRoots,
-    ).toBeUndefined();
+    for (const action of [newSession(), resetSessionToolAllow()]) {
+      store.dispatch(action);
+      const results = await evaluateToolPolicies(
+        store.dispatch as any,
+        store.mockIdeMessenger,
+        [tool],
+        [call],
+        {},
+      );
+      expect(results[0].policy).toBe("allowedWithoutPermission");
+    }
+  });
+  it("automatically approves terminal commands without a session grant", async () => {
+    const { store } = setup();
+    store.mockIdeMessenger.responses["tools/evaluatePolicy"] = {
+      policy: "allowedWithoutPermission",
+      terminalApproved: true,
+    };
+    const terminalCall = {
+      ...call,
+      toolCall: {
+        ...call.toolCall,
+        function: { name: T.RunTerminalCommand, arguments: "{}" },
+      },
+    };
+    const results = await evaluateToolPolicies(
+      store.dispatch as any,
+      store.mockIdeMessenger,
+      [],
+      [terminalCall],
+      { [T.RunTerminalCommand]: "allowedWithPermission" },
+    );
+    expect(results[0].policy).toBe("allowedWithoutPermission");
   });
 });

@@ -1,7 +1,4 @@
-import { allowWorkspaceFilesForChat } from "../../redux/thunks/allowWorkspaceFilesForChat";
 import { Button } from "../../components/ui";
-import { BuiltInToolNames } from "core/tools/builtIn";
-import { selectActiveTools } from "../../redux/selectors/selectActiveTools";
 import { selectAgentBusy } from "../../redux/selectors/selectAgentBusy";
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -10,9 +7,6 @@ import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import {
   newSession,
-  setWorkspaceFileApproval,
-  allowToolForSession,
-  revokeToolForSession,
   resetSessionToolAllow,
 } from "../../redux/slices/sessionSlice";
 import { saveCurrentSession } from "../../redux/thunks/session";
@@ -25,17 +19,12 @@ export function ChatControls() {
   const messenger = useContext(IdeMessengerContext);
   const session = useAppSelector((s) => s.session);
   const agentBusy = useAppSelector(selectAgentBusy);
-  const activeTools = useAppSelector(selectActiveTools);
-  const terminalName = BuiltInToolNames.RunTerminalCommand;
-  const terminalAllowed = session.sessionToolAllow[terminalName] === true;
   const model = useAppSelector(selectSelectedChatModel);
   const [expanded, setExpanded] = useState(false);
   const [account, setAccount] = useState<VeniceAccount>();
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  const [grantingFiles, setGrantingFiles] = useState(false);
-  const workspaceFilesAllowed = !!session.workspaceFileApprovalRoots?.length;
   const refresh = async () => {
     setBusy(true);
     try {
@@ -146,53 +135,9 @@ export function ChatControls() {
         >
           Usage {expanded ? "▴" : "▾"}
         </Button>
-        {activeTools.some((tool) => tool.function.name === terminalName) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-pressed={terminalAllowed}
-            title="Run terminal commands without confirmation for this open chat. Explicitly blocked commands stay blocked. Resets when you switch chats or reload."
-            onClick={() =>
-              dispatch(
-                terminalAllowed
-                  ? revokeToolForSession(terminalName)
-                  : allowToolForSession(terminalName),
-              )
-            }
-          >
-            {terminalAllowed
-              ? "Terminal: auto · this chat"
-              : "Allow terminal this chat"}
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-pressed={workspaceFilesAllowed}
-          disabled={grantingFiles}
-          title="Allow reading, creating and editing files inside this local workspace, and automatically accept those file changes. Outside files still require approval. Resets when you switch chats or reload; changing workspace folders invalidates the grant."
-          onClick={async () => {
-            if (workspaceFilesAllowed) {
-              dispatch(setWorkspaceFileApproval(undefined));
-              return;
-            }
-            setGrantingFiles(true);
-            try {
-              await dispatch(allowWorkspaceFilesForChat()).unwrap();
-              setNotice("");
-            } catch {
-              setNotice(
-                "Could not enable workspace file access. Open a local folder and try again.",
-              );
-            } finally {
-              setGrantingFiles(false);
-            }
-          }}
-        >
-          {workspaceFilesAllowed
-            ? "Workspace files: auto · this chat"
-            : "Allow workspace files this chat"}
-        </Button>
+        <span title="Terminal commands and files inside the current local workspace are approved automatically in every chat. Disabled tools remain disabled. File tools outside the workspace still need approval.">
+          Terminal & workspace files: auto
+        </span>
         {agentBusy && (
           <Button
             variant="ghost"
@@ -204,17 +149,16 @@ export function ChatControls() {
         )}
       </div>
       {notice && <div role="alert">{notice}</div>}
-      {(Object.keys(session.sessionToolAllow).length > 0 ||
-        workspaceFilesAllowed) && (
+      {Object.keys(session.sessionToolAllow).length > 0 && (
         <div className="mt-1">
           {Object.keys(session.sessionToolAllow).length} tool(s) allowed for
-          this chat{workspaceFilesAllowed ? " · Workspace files allowed" : ""} ·{" "}
+          this chat ·{" "}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => dispatch(resetSessionToolAllow())}
           >
-            Reset permissions
+            Reset other chat permissions
           </Button>
         </div>
       )}

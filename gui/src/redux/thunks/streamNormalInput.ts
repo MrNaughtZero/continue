@@ -382,7 +382,6 @@ export const streamNormalInput = createAsyncThunk<
       toolPolicies,
       state3.session.sessionToolAllow[BuiltInToolNames.RunTerminalCommand] ===
         true,
-      state3.session.workspaceFileApprovalRoots,
     );
     const autoApprovedPolicies = policies.filter(
       ({ policy }) => policy === "allowedWithoutPermission",

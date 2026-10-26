@@ -10,22 +10,21 @@ local improvements while retaining Continue's existing session format and
 - **New chat** and **History** are always visible above the conversation.
   Stop an active run and wait for running tools to finish before switching chats.
   New chat saves the current conversation before clearing the screen.
-- **Allow this chat** beside a tool request approves that tool for the current
-  open chat only. Opening another chat or reloading the extension resets these
-  permissions. **Reset permissions** clears them immediately. Globally excluded
-  tools and explicitly blocked terminal commands still apply. For terminal tools,
-  this approval also covers command-specific confirmation prompts. The header's
-  **Allow terminal this chat** toggle enables the same mode without running a
-  pending command; click it again to restore prompts. Existing global tool settings
-  remain available in Tools.
-- **Allow workspace files this chat** grants reading, creating and editing files
-  within the currently open local workspace folders. Completed agent edits are
-  accepted automatically too. It also handles pending file requests and edits.
-  Click again or **Reset permissions** to revoke it. New/opened chats and reloads
-  clear it. File paths are checked against the approved workspace roots, including
-  resolved symlinks; outside files still require approval. Changing workspace
-  roots invalidates the grant. Disabled tools remain disabled. Remote workspaces
-  are not supported by this local-files grant.
+- **Terminal & workspace files: auto** is enabled by default for every chat and
+  model. No session switches are needed after opening chats or reloading Cursor.
+  Built-in terminal commands run without repeated approval; explicitly disabled
+  tools and blocked commands remain disabled. Terminal commands use the normal
+  shell permissions and are not sandboxed to the workspace directory.
+- Built-in file reads (including ranges and the active file), directory listings,
+  creation and edits are approved automatically inside the current local Cursor
+  workspace folders. Completed agent edits are accepted automatically too. The
+  backend checks the actual target and resolves symlinks; file tools targeting
+  outside locations still require review. Remote workspaces do not inherit this
+  local-file default. Workspace changes are evaluated against the new roots.
+  Relative paths, absolute paths and file URIs are supported consistently.
+- **Allow this chat** remains available for other tool requests. These optional
+  grants clear on chat changes and reloads. **Reset other chat permissions**
+  clears them without changing the terminal/workspace defaults.
 - Web requests offer **Allow web for chat**, covering both search and reading URLs.
   **Allow Playwright for chat** covers all enabled tools on the configured
   **Chrome (Playwright)** server. These are the primary acceptance actions,

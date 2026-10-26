@@ -3,7 +3,6 @@ import { ToolPolicy } from "@continuedev/terminal-security";
 import { Tool, ToolCallState } from "core";
 import { BuiltInToolNames } from "core/tools/builtIn";
 import { IIdeMessenger } from "../../context/IdeMessenger";
-import { isEditTool } from "../../util/toolCallState";
 import { errorToolCall, updateToolCallOutput } from "../slices/sessionSlice";
 import { DEFAULT_TOOL_SETTING, ToolPolicies } from "../slices/uiSlice";
 import { AppThunkDispatch } from "../store";
@@ -24,17 +23,7 @@ async function evaluateToolPolicy(
   toolCallState: ToolCallState,
   toolPolicies: ToolPolicies,
   sessionTerminalApproved: boolean,
-  workspaceFileApprovalRoots?: string[],
 ): Promise<EvaluatedPolicy> {
-  // allow edit tool calls without permission
-  if (
-    isEditTool(toolCallState.toolCall.function.name) &&
-    !workspaceFileApprovalRoots &&
-    toolPolicies[toolCallState.toolCall.function.name] !== "disabled"
-  ) {
-    return { policy: "allowedWithoutPermission", toolCallState };
-  }
-
   const basePolicy =
     toolPolicies[toolCallState.toolCall.function.name] ??
     activeTools.find(
@@ -48,7 +37,6 @@ async function evaluateToolPolicy(
     basePolicy,
     parsedArgs: toolCallState.parsedArgs,
     processedArgs: toolCallState.processedArgs,
-    ...(workspaceFileApprovalRoots ? { workspaceFileApprovalRoots } : {}),
   });
 
   // Evaluate the policy dynamically
@@ -65,7 +53,7 @@ async function evaluateToolPolicy(
   if (basePolicy === "disabled") {
     return { policy: "disabled", displayValue, toolCallState }; // Cannot override disabled
   }
-  if (workspaceFileApprovalRoots && WORKSPACE_FILE_TOOLS.includes(toolName)) {
+  if (WORKSPACE_FILE_TOOLS.includes(toolName)) {
     return {
       policy:
         result.content.workspaceFileApproved === true &&
@@ -77,6 +65,13 @@ async function evaluateToolPolicy(
       displayValue,
       toolCallState,
     };
+  }
+  if (
+    toolName === BuiltInToolNames.RunTerminalCommand &&
+    result.content.terminalApproved === true &&
+    dynamicPolicy === "allowedWithoutPermission"
+  ) {
+    return { policy: "allowedWithoutPermission", displayValue, toolCallState };
   }
   // Explicit approval for this open chat covers command-specific prompts too.
   // Keep evaluator failures and explicit command exclusions authoritative.
@@ -110,7 +105,6 @@ export async function evaluateToolPolicies(
   generatedToolCalls: ToolCallState[],
   toolPolicies: ToolPolicies,
   sessionTerminalApproved = false,
-  workspaceFileApprovalRoots?: string[],
 ): Promise<EvaluatedPolicy[]> {
   // Check if ALL tool calls are auto-approved using dynamic evaluation
   const policyResults = await Promise.all(
@@ -121,7 +115,6 @@ export async function evaluateToolPolicies(
         toolCallState,
         toolPolicies,
         sessionTerminalApproved,
-        workspaceFileApprovalRoots,
       ),
     ),
   );

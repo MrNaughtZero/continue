@@ -51,25 +51,26 @@ async function canonicalPath(filename: string): Promise<string> {
   }
 }
 
-/** This grant is for the same local workspace roots the user approved. Fail closed. */
+/** Validate against the current local workspace; optional roots pin a caller to a snapshot. */
 export async function isWorkspaceFileApproved(
   ide: IDE,
   toolName: string,
   args: Record<string, unknown>,
-  approvedRoots: string[],
+  approvedRoots?: string[],
   actualFileUri?: string,
 ): Promise<boolean> {
   try {
     if (
       !WORKSPACE_FILE_TOOLS.includes(toolName) ||
-      !approvedRoots.length ||
       (await ide.isWorkspaceRemote())
     )
       return false;
     const roots = await ide.getWorkspaceDirs();
     if (
-      roots.length !== approvedRoots.length ||
-      roots.some((root) => !approvedRoots.includes(root))
+      !roots.length ||
+      (approvedRoots &&
+        (roots.length !== approvedRoots.length ||
+          roots.some((root) => !approvedRoots.includes(root))))
     )
       return false;
     if (roots.some((root) => !root.startsWith("file://"))) return false;
@@ -81,6 +82,10 @@ export async function isWorkspaceFileApproved(
         uri = current.path.startsWith("file://")
           ? current.path
           : pathToFileURL(current.path).href;
+      } else if (toolName === BuiltInToolNames.LSTool) {
+        const input = args.dirPath ?? ".";
+        if (typeof input !== "string") return false;
+        uri = (await resolveInputPath(ide, input || "."))?.uri;
       } else {
         if (typeof args.filepath !== "string" || !args.filepath.trim())
           return false;

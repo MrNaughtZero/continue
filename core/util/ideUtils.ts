@@ -1,4 +1,5 @@
 import { IDE } from "..";
+import * as URI from "uri-js";
 
 import {
   joinEncodedUriPathSegmentToUri,
@@ -16,6 +17,21 @@ export async function resolveRelativePathInDir(
   ide: IDE,
   dirUriCandidates?: string[],
 ): Promise<string | undefined> {
+  const input = path.trim();
+  if (
+    input.startsWith("file://") ||
+    input.startsWith("/") ||
+    /^[A-Za-z]:[\\/]/.test(input)
+  ) {
+    const uri = input.startsWith("file://")
+      ? input
+      : URI.serialize({
+          scheme: "file",
+          host: "",
+          path: input.replaceAll("\\", "/"),
+        });
+    return (await ide.fileExists(uri)) ? uri : undefined;
+  }
   const dirs = dirUriCandidates ?? (await ide.getWorkspaceDirs());
   for (const dirUri of dirs) {
     const fullUri = joinPathsToUri(dirUri, path);

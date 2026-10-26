@@ -57,10 +57,9 @@ export const handleApplyStateUpdate = createAsyncThunk<
         ) {
           const state = getState();
           const name = toolCallState.toolCall.function.name;
-          const roots = state.session.workspaceFileApprovalRoots;
           let autoAccept =
             state.ui.toolSettings[name] === "allowedWithoutPermission";
-          if (roots && WORKSPACE_FILE_TOOLS.includes(name)) {
+          if (WORKSPACE_FILE_TOOLS.includes(name)) {
             autoAccept = false;
             const tool = selectActiveTools(state).find(
               (tool) => tool.function.name === name,
@@ -81,7 +80,6 @@ export const handleApplyStateUpdate = createAsyncThunk<
                       tool.defaultToolPolicy ??
                       "allowedWithPermission",
                     parsedArgs: toolCallState.parsedArgs,
-                    workspaceFileApprovalRoots: roots,
                     workspaceFileUri: applyState.filepath,
                   },
                 );
@@ -95,7 +93,6 @@ export const handleApplyStateUpdate = createAsyncThunk<
                   result.content.workspaceFileApproved === true &&
                   result.content.policy === "allowedWithoutPermission" &&
                   current.session.id === state.session.id &&
-                  current.session.workspaceFileApprovalRoots === roots &&
                   currentTool?.status === "calling" &&
                   selectActiveTools(current).some(
                     (tool) => tool.function.name === name,
